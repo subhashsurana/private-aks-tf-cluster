@@ -1,0 +1,68 @@
+---
+- name: Configure Azure Workload Identity Federation with GitHub Actions
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  collections:
+    - azure.azcollection
+    - community.general
+
+  vars:
+    azure_ad_app_name: "my-github-actions-app"
+    azure_subscription_id: "YOUR_AZURE_SUBSCRIPTION_ID"
+    azure_tenant_id: "YOUR_AZURE_TENANT_ID"
+    github_owner: "YOUR_GITHUB_OWNER"
+    github_repo: "YOUR_GITHUB_REPO"
+    github_branch: "*"
+    github_pat: "{{ lookup('env', 'GITHUB_PAT') }}" # Securely load from environment variable
+
+  tasks:
+    - name: Create Azure AD Application
+      azure.azcollection.azure_rm_adapplication:
+        tenant: "{{ azure_tenant_id }}"
+        display_name: "{{ azure_ad_app_name }}"
+      register: ad_app
+
+    - name: Create Service Principal for the AD Application
+      azure.azcollection.azure_rm_adserviceprincipal:
+        tenant: "{{ azure_tenant_id }}"
+        app_id: "{{ ad_app.app.appId }}"
+      register: sp
+
+    - name: Grant Contributor role to the Service Principal
+      azure.azcollection.azure_rm_roleassignment:
+        tenant: "{{ azure_tenant_id }}"
+        subscription_id: "{{ azure_subscription_id }}"
+        assignee_object_id: "{{ sp.sp.id }}"
+        role_definition_name: "Contributor"
+        scope: "/subscriptions/{{ azure_subscription_id }}"
+
+    - name: Create Federated Identity Credential via Azure CLI
+      ansible.builtin.command: |
+        az ad app federated-credential create \
+        --id "{{ ad_app.app.appId }}" \
+        --parameters '{
+          "name":"github-federated-credential",
+          "issuer":"https://token.actions.githubusercontent.com",
+          "subject":"repo:{{ github_owner }}/{{ github_repo }}:ref:refs/heads/{{ github_branch }}",
+          "audiences":["api://AzureADTokenExchange"]
+        }'
+
+    - name: Set GitHub Repository Secrets
+      community.general.uri:
+        url: "https://api.github.com/repos/{{ github_owner }}/{{ github_repo }}/actions/secrets/{{ item.name }}"
+        method: PUT
+        headers:
+          Authorization: "token {{ github_pat }}"
+          Accept: "application/vnd.github.v3+json"
+        body:
+          encrypted_value: "{{ lookup('pipe', 'echo ' + item.value + ' | openssl base64 | tr -d ''\\n''') }}"
+          key_id: "{{ key_info.json.key_id }}"
+        body_format: json
+      loop:
+        - { name: 'AZURE_CLIENT_ID', value: '{{ ad_app.app.appId }}' }
+        - { name: 'AZURE_TENANT_ID', value: '{{ azure_tenant_id }}' }
+        - { name: 'AZURE_SUBSCRIPTION_ID', value: '{{ azure_subscription_id }}' }
+      vars:
+        key_info: "{{ lookup('url', 'https://api.github.com/repos/{{ github_owner }}/{{ github_repo }}/actions/secrets/public-key', headers='Authorization: token {{ github_pat }}', method='GET') }}"
+

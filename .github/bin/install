@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# install terraform
+brew install tfenv
+tfenv install latest
+tfenv use latest
+terraform --version
+
+# install terraspace
+bundle install
+bundle exec terraspace new shim
+terraspace --version
+
+# install infracost
+curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh

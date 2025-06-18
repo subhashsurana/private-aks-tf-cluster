@@ -34,3 +34,9 @@ terraform.tfvars
 /test/tmp
 /test/version_tmp
 /tmp
+
+# Python related
+*.venv
+
+# VScode
+.vscode
