@@ -40,3 +40,6 @@ terraform.tfvars
 
 # VScode
 .vscode
+
+# devcontainer
+*.devcontainer

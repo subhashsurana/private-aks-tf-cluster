@@ -22,25 +22,37 @@
         tenant: "{{ azure_tenant_id }}"
         display_name: "{{ azure_ad_app_name }}"
       register: ad_app
+    
+    - name: Debug AD App output
+      debug:
+        var: ad_app
+
 
     - name: Create Service Principal for the AD Application
       azure.azcollection.azure_rm_adserviceprincipal:
         tenant: "{{ azure_tenant_id }}"
-        app_id: "{{ ad_app.app.appId }}"
+        app_id: "{{ ad_app.app_id }}"
       register: sp
+
+    - name: Get Contributor role definition
+      azure.azcollection.azure_rm_roledefinition_info:
+        role_name: "Contributor"
+        scope: "/subscriptions/{{ azure_subscription_id }}"
+      register: contributor_role
 
     - name: Grant Contributor role to the Service Principal
       azure.azcollection.azure_rm_roleassignment:
         tenant: "{{ azure_tenant_id }}"
         subscription_id: "{{ azure_subscription_id }}"
-        assignee_object_id: "{{ sp.sp.id }}"
-        role_definition_name: "Contributor"
+        assignee_object_id: "{{ sp.object_id }}"
+        role_definition_id: "{{ contributor_role.roledefinitions[0].id }}"
         scope: "/subscriptions/{{ azure_subscription_id }}"
+
 
     - name: Create Federated Identity Credential via Azure CLI
       ansible.builtin.command: |
         az ad app federated-credential create \
-        --id "{{ ad_app.app.appId }}" \
+        --id "{{ ad_app.app_id }}" \
         --parameters '{
           "name":"github-federated-credential",
           "issuer":"https://token.actions.githubusercontent.com",
@@ -49,7 +61,7 @@
         }'
 
     - name: Set GitHub Repository Secrets
-      community.general.uri:
+      ansible.builtin.uri:
         url: "https://api.github.com/repos/{{ github_owner }}/{{ github_repo }}/actions/secrets/{{ item.name }}"
         method: PUT
         headers:
@@ -60,9 +72,9 @@
           key_id: "{{ key_info.json.key_id }}"
         body_format: json
       loop:
-        - { name: 'AZURE_CLIENT_ID', value: '{{ ad_app.app.appId }}' }
+        - { name: 'AZURE_CLIENT_ID', value: '{{ ad_app.app_id }}' }
         - { name: 'AZURE_TENANT_ID', value: '{{ azure_tenant_id }}' }
         - { name: 'AZURE_SUBSCRIPTION_ID', value: '{{ azure_subscription_id }}' }
       vars:
-        key_info: "{{ lookup('url', 'https://api.github.com/repos/{{ github_owner }}/{{ github_repo }}/actions/secrets/public-key', headers='Authorization: token {{ github_pat }}', method='GET') }}"
+        key_info: "{{ lookup('url', 'https://api.github.com/repos/{{ github_owner }}/{{ github_repo }}/actions/secrets/public-key', headers={'Authorization': 'token {{ github_pat }}'}, method='GET') }}"
 

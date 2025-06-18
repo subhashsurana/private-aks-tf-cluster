@@ -126,13 +126,35 @@ if ! command -v ansible &> /dev/null; then
     print_success "Ansible installed."
 fi
 
-if ! ansible-galaxy collection list | grep -q 'azure.azcollection'; then
-    print_warning "Ansible collection 'azure.azcollection' not found. Installing..."
-    ansible-galaxy collection install azure.azcollection:>=1.16.0 --force
+pip install --upgrade ansible[azure]
+pip install --upgrade azure-mgmt-resource azure-identity
+pip install --force-reinstall azure-cli==2.74.0
+# --- Install Azure SDKs from collection's upstream requirements ---
+REQ_FILE="$VENV_DIR/requirements-azure.txt"
+REQ_URL="https://raw.githubusercontent.com/ansible-collections/azure/refs/heads/dev/requirements.txt"
+
+print_info "Downloading Azure SDK requirements from upstream repository..."
+curl -sSL "$REQ_URL" -o "$REQ_FILE"
+
+if [ -f "$REQ_FILE" ]; then
+    print_info "Installing Python SDKs required by azure.azcollection..."
+    pip install -r "$REQ_FILE"
+    print_success "Azure SDK dependencies installed successfully."
+else
+    print_warning "requirements.txt could not be downloaded. Skipping Azure SDK install step."
 fi
-if ! ansible-galaxy collection list | grep -q 'community.general'; then
+
+#pip install azure-mgmt-resource azure-mgmt-network azure-mgmt-authorization azure-mgmt-msi azure-identity \
+# azure-storage-blob azure-storage-common azure-mgmt-automation azure.mgmt.notificationhubs azure.mgmt.datafactory \
+# microsoft-kiota-authentication-azure microsoft-kiota-authentication-azure msgraph-sdk
+
+if ! ansible-galaxy collection list | grep 'azure.azcollection'; then
+    print_warning "Ansible collection 'azure.azcollection' not found. Installing..."
+    ansible-galaxy collection install azure.azcollection --force
+fi
+if ! ansible-galaxy collection list | grep 'community.general'; then
     print_warning "Ansible collection 'community.general' not found. Installing..."
-    ansible-galaxy collection install community.general
+    ansible-galaxy collection install community.general --force
 fi
 print_success "Ansible environment is ready."
 ansible-galaxy collection list | grep community.general
