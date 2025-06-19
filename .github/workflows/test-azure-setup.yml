@@ -3,6 +3,9 @@ name: Verify Azure Setup
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - 'feature/**'
 
 jobs:
   create-rg:
