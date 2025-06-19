@@ -16,6 +16,14 @@ jobs:
       contents: read
 
     steps:
+    - name: Debug OIDC Token Claims
+      shell: bash
+      run: |
+        echo "Retrieving GitHub OIDC token..."
+        TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL?audience=api://AzureADTokenExchange")
+        echo "Decoding token claims..."
+        echo "$TOKEN" | jq -r '.value' | cut -d "." -f2 | base64 -d | jq
+
     - name: Login to Azure with Federated Identity
       uses: azure/login@v1
       with:
