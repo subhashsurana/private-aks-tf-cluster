@@ -3,30 +3,40 @@
   hosts: localhost
   connection: local
   gather_facts: false
-  collections:
-    - azure.azcollection
-    - community.general
+  # collections:
+  #   - azure.azcollection
+  #   - community.general
 
   vars:
     azure_ad_app_name: "my-github-actions-app"
-    azure_subscription_id: "YOUR_AZURE_SUBSCRIPTION_ID"
-    azure_tenant_id: "YOUR_AZURE_TENANT_ID"
-    github_owner: "YOUR_GITHUB_OWNER"
-    github_repo: "YOUR_GITHUB_REPO"
     github_branch: "*"
     github_pat: "{{ lookup('env', 'GITHUB_PAT') }}" # Securely load from environment variable
 
   tasks:
+    - name: Print debug info
+      ansible.builtin.debug:
+        msg: "Creating federated credential for {{ github_owner }}/{{ github_repo }}"
+
+    - name: Get public key for the GitHub repository
+      ansible.builtin.uri:
+        url: "https://api.github.com/repos/{{ github_owner }}/{{ github_repo }}/actions/secrets/public-key"
+        method: GET
+        headers:
+          Authorization: "token {{ github_pat }}"
+          Accept: "application/vnd.github.v3+json"
+        return_content: true
+      register: github_key
+
+    - name: Set public key facts
+      ansible.builtin.set_fact:
+        github_public_key: "{{ github_key.json.key }}"
+        github_public_key_id: "{{ github_key.json.key_id }}"
+
     - name: Create Azure AD Application
       azure.azcollection.azure_rm_adapplication:
         tenant: "{{ azure_tenant_id }}"
         display_name: "{{ azure_ad_app_name }}"
       register: ad_app
-    
-    - name: Debug AD App output
-      debug:
-        var: ad_app
-
 
     - name: Create Service Principal for the AD Application
       azure.azcollection.azure_rm_adserviceprincipal:
@@ -48,7 +58,6 @@
         role_definition_id: "{{ contributor_role.roledefinitions[0].id }}"
         scope: "/subscriptions/{{ azure_subscription_id }}"
 
-
     - name: Create Federated Identity Credential via Azure CLI
       ansible.builtin.command: |
         az ad app federated-credential create \
@@ -58,23 +67,49 @@
           "issuer":"https://token.actions.githubusercontent.com",
           "subject":"repo:{{ github_owner }}/{{ github_repo }}:ref:refs/heads/{{ github_branch }}",
           "audiences":["api://AzureADTokenExchange"]
-        }'
+          }'
+      changed_when: false
+
+    - name: Check if encrypt_secrets.py exists
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/scripts/encrypt_secrets.py"
+      register: encrypt_secrets
+
+    - name: Fail if script is missing
+      ansible.builtin.fail:
+        msg: "The script encrypt_secrets.py is missing!"
+      when: not encrypt_secrets.stat.exists
+
+    - name: Encrypt secret using external Python script
+      ansible.builtin.command: >
+        python3 "{{ playbook_dir }}/scripts/encrypt_secrets.py" "{{ github_public_key }}" "{{ item.value }}"
+      register: encrypted_secrets
+      changed_when: false
+      loop:
+        - { name: "AZURE_CLIENT_ID", value: "{{ ad_app.app_id }}" }
+        - { name: "AZURE_TENANT_ID", value: "{{ azure_tenant_id }}" }
+        - { name: "AZURE_SUBSCRIPTION_ID", value: "{{ azure_subscription_id }}" }
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Debug encrypted secret
+      debug:
+        msg: "Encrypted {{ item.item.name }} = {{ item.stdout }}"
+      loop: "{{ encrypted_secrets.results }}"
+
 
     - name: Set GitHub Repository Secrets
       ansible.builtin.uri:
-        url: "https://api.github.com/repos/{{ github_owner }}/{{ github_repo }}/actions/secrets/{{ item.name }}"
+        url: "https://api.github.com/repos/{{ github_owner }}/{{ github_repo }}/actions/secrets/{{ item.item.name }}"
         method: PUT
         headers:
           Authorization: "token {{ github_pat }}"
           Accept: "application/vnd.github.v3+json"
         body:
-          encrypted_value: "{{ lookup('pipe', 'echo ' + item.value + ' | openssl base64 | tr -d ''\\n''') }}"
-          key_id: "{{ key_info.json.key_id }}"
+          encrypted_value: "{{ item.stdout | trim }}"
+          key_id: "{{ github_public_key_id }}"
         body_format: json
-      loop:
-        - { name: 'AZURE_CLIENT_ID', value: '{{ ad_app.app_id }}' }
-        - { name: 'AZURE_TENANT_ID', value: '{{ azure_tenant_id }}' }
-        - { name: 'AZURE_SUBSCRIPTION_ID', value: '{{ azure_subscription_id }}' }
-      vars:
-        key_info: "{{ lookup('url', 'https://api.github.com/repos/{{ github_owner }}/{{ github_repo }}/actions/secrets/public-key', headers={'Authorization': 'token {{ github_pat }}'}, method='GET') }}"
-
+        status_code: [200, 201, 204]
+      loop: "{{ encrypted_secrets.results }}"
+      loop_control:
+        label: "{{ item.item.name }}"

@@ -33,8 +33,8 @@ print_info "Setting up Python and Ansible virtual environment..."
 
 # 0. Start with a clean slate by removing any previous, possibly broken, venv.
 if [ -d "$VENV_DIR" ]; then
-    print_warning "Removing existing '.venv' directory to ensure a clean start."
-    rm -rf "$VENV_DIR"
+   print_warning "Removing existing '.venv' directory to ensure a clean start."
+   rm -rf "$VENV_DIR"
 fi
 
 # 1. Check for Python 3
@@ -126,15 +126,13 @@ if ! command -v ansible &> /dev/null; then
     print_success "Ansible installed."
 fi
 
-pip install --upgrade ansible[azure]
-pip install --upgrade azure-mgmt-resource azure-identity
-pip install --force-reinstall azure-cli==2.74.0
+pip install azure-cli
 # --- Install Azure SDKs from collection's upstream requirements ---
-REQ_FILE="$VENV_DIR/requirements-azure.txt"
-REQ_URL="https://raw.githubusercontent.com/ansible-collections/azure/refs/heads/dev/requirements.txt"
+REQ_FILE="requirements-azure.txt"
+#REQ_URL="https://raw.githubusercontent.com/ansible-collections/azure/refs/heads/dev/requirements.txt"
 
-print_info "Downloading Azure SDK requirements from upstream repository..."
-curl -sSL "$REQ_URL" -o "$REQ_FILE"
+#print_info "Downloading Azure SDK requirements from upstream repository..."
+#curl -sSL "$REQ_URL" -o "$REQ_FILE"
 
 if [ -f "$REQ_FILE" ]; then
     print_info "Installing Python SDKs required by azure.azcollection..."
@@ -157,9 +155,8 @@ if ! ansible-galaxy collection list | grep 'community.general'; then
     ansible-galaxy collection install community.general --force
 fi
 print_success "Ansible environment is ready."
-ansible-galaxy collection list | grep community.general
-
-
+ansible-galaxy collection install community.crypto
+pip install pynacl
 # --- Prerequisite Checks ---
 
 # 1. Check for Azure CLI login
@@ -177,6 +174,8 @@ print_info "Fetching details from your active Azure account..."
 print_info "To use a different subscription, run 'az account set --subscription <NAME_OR_ID>' and re-run this script."
 AZURE_SUBSCRIPTION_ID=$(az account show --query id --output tsv)
 AZURE_TENANT_ID=$(az account show --query tenantId --output tsv)
+az configure --defaults location=eastus
+AZURE_DEFAULT_LOCATION=$(az configure --list-defaults --query "[?name=='location'].value" -o tsv)
 
 if [[ -z "$AZURE_SUBSCRIPTION_ID" || -z "$AZURE_TENANT_ID" ]]; then
     print_error "Could not fetch Azure Subscription ID and/or Tenant ID. Please check your 'az login' status."
@@ -222,7 +221,8 @@ ansible-playbook ansible_playbook/ansible_playbook_azure_gh.yml \
     -e "azure_subscription_id=$AZURE_SUBSCRIPTION_ID" \
     -e "azure_tenant_id=$AZURE_TENANT_ID" \
     -e "github_owner=$GITHUB_OWNER" \
-    -e "github_repo=$GITHUB_REPO"
+    -e "github_repo=$GITHUB_REPO" \
+    -e "azure_location"=$AZURE_DEFAULT_LOCATION
 
 print_success "Playbook execution finished. The trust relationship should be established."
 
