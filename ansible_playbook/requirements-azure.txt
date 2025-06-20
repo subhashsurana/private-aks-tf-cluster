@@ -1,12 +1,25 @@
-# Core Azure SDKs for Ansible modules
+# Identity & Auth
 azure-identity
-azure-mgmt-resource
 azure-mgmt-msi
 azure-mgmt-authorization
-msrest
+azure.mgmt.automation
+azure.mgmt.notificationhubs
+azure.mgmt.datafactory
 
-# GitHub OIDC encryption support
+# Resource Management
+azure-mgmt-resource
+azure.mgmt.resourcehealth
+
+# Networking & Storage
+azure-mgmt-network
+azure-storage-blob
+
+# Optional Graph
+msgraph-core
+msgraph-sdk
+
+# Ansible Crypto Support
 pynacl
 
-# Optional (if doing role or graph-based stuff via REST)
-msgraph-core
+azure-storage-common
+azure-mgmt-automation

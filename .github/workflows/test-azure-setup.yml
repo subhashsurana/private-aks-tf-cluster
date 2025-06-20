@@ -21,6 +21,10 @@ jobs:
         TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL?audience=api://AzureADTokenExchange")
         echo "$TOKEN" | jq -r '.value' | cut -d "." -f2 | base64 -d | jq
 
+    - name: Debug hashed client ID
+      run: |
+        echo -n "${{ secrets.AZURE_CLIENT_ID }}" | sha256sum
+        
     - name: Manual OIDC Token Fetch
       shell: bash
       run: |

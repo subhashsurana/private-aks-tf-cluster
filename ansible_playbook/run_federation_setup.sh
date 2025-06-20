@@ -32,10 +32,10 @@ print_error() {
 print_info "Setting up Python and Ansible virtual environment..."
 
 # 0. Start with a clean slate by removing any previous, possibly broken, venv.
-if [ -d "$VENV_DIR" ]; then
-   print_warning "Removing existing '.venv' directory to ensure a clean start."
-   rm -rf "$VENV_DIR"
-fi
+# if [ -d "$VENV_DIR" ]; then
+#    print_warning "Removing existing '.venv' directory to ensure a clean start."
+#    rm -rf "$VENV_DIR"
+# fi
 
 # 1. Check for Python 3
 if ! command -v python3 &> /dev/null; then
@@ -127,19 +127,32 @@ if ! command -v ansible &> /dev/null; then
 fi
 
 pip install azure-cli
+pip install ansible[azure]
 # --- Install Azure SDKs from collection's upstream requirements ---
 REQ_FILE="requirements-azure.txt"
 #REQ_URL="https://raw.githubusercontent.com/ansible-collections/azure/refs/heads/dev/requirements.txt"
 
 #print_info "Downloading Azure SDK requirements from upstream repository..."
 #curl -sSL "$REQ_URL" -o "$REQ_FILE"
+# Get the directory of the current script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if [ -f "$REQ_FILE" ]; then
-    print_info "Installing Python SDKs required by azure.azcollection..."
-    pip install -r "$REQ_FILE"
-    print_success "Azure SDK dependencies installed successfully."
+echo "Looking for file at: $SCRIPT_DIR/requirements-azure.txt"
+ls -l "$SCRIPT_DIR/requirements-azure.txt"
+
+REQ_FILE="$SCRIPT_DIR/requirements-azure.txt"
+echo "🔎 Looking for requirements at: $REQ_FILE"
+
+if [[ -f "$REQ_FILE" ]]; then
+    echo "🧩 Installing Azure SDK dependencies from $REQ_FILE..."
+    pip install --upgrade pip
+    pip install -r "$REQ_FILE" || {
+        echo "❌ Failed to install from $REQ_FILE"
+        exit 1
+    }
 else
-    print_warning "requirements.txt could not be downloaded. Skipping Azure SDK install step."
+    echo "⚠️  WARNING: $REQ_FILE not found. Skipping SDK install."
+    exit 1
 fi
 
 #pip install azure-mgmt-resource azure-mgmt-network azure-mgmt-authorization azure-mgmt-msi azure-identity \
@@ -216,6 +229,13 @@ print_info "All checks passed. Executing the Ansible playbook..."
 # Export the PAT so the playbook can access it securely via lookup('env', 'GITHUB_PAT')
 export GITHUB_PAT
 
+# List apps with your prefix
+az ad app list --filter "startswith(displayName,'my-github-actions-app')" --query "[].appId" -o tsv |
+while read app_id; do
+  echo "Deleting App: $app_id"
+  az ad app delete --id "$app_id"
+done
+
 # Assumes the playbook is named 'ansible_playbook_azure_gh.yml' and is in the same directory
 ansible-playbook ansible_playbook/ansible_playbook_azure_gh.yml \
     -e "azure_subscription_id=$AZURE_SUBSCRIPTION_ID" \
@@ -223,6 +243,7 @@ ansible-playbook ansible_playbook/ansible_playbook_azure_gh.yml \
     -e "github_owner=$GITHUB_OWNER" \
     -e "github_repo=$GITHUB_REPO" \
     -e "azure_location"=$AZURE_DEFAULT_LOCATION
+    -vvv
 
 print_success "Playbook execution finished. The trust relationship should be established."
 
