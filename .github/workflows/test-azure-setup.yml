@@ -11,8 +11,8 @@ jobs:
     name: Login to Azure
     runs-on: ubuntu-latest
     permissions:
-    id-token: write
-    contents: read
+      id-token: write
+      contents: read
     steps:
     - name: Show OIDC Token Claims
       shell: bash
