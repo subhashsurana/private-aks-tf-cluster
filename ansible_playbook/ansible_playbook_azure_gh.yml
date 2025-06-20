@@ -9,7 +9,7 @@
 
   vars:
     azure_ad_app_name: "my-github-actions-app"
-    github_branch: "*"
+#    github_branch: "*"
     github_pat: "{{ lookup('env', 'GITHUB_PAT') }}" # Securely load from environment variable
 
   tasks:

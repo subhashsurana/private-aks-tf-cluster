@@ -207,8 +207,10 @@ fi
 if [[ "$GIT_URL" =~ github.com[:/]([^/]+)/([^/.]+)(\.git)?$ ]]; then
     GITHUB_OWNER="${BASH_REMATCH[1]}"
     GITHUB_REPO="${BASH_REMATCH[2]}"
+    GITHUB_BRANCH=$(git rev-parse --abbrev-ref HEAD)
     print_success "Detected GitHub Owner: $GITHUB_OWNER"
     print_success "Detected GitHub Repo:  $GITHUB_REPO"
+    print_success "Detected GitHub current Branch:  $GITHUB_BRANCH"
 else
     print_error "Could not parse GitHub owner and repo from URL: $GIT_URL"
 fi
@@ -242,8 +244,7 @@ ansible-playbook ansible_playbook/ansible_playbook_azure_gh.yml \
     -e "azure_tenant_id=$AZURE_TENANT_ID" \
     -e "github_owner=$GITHUB_OWNER" \
     -e "github_repo=$GITHUB_REPO" \
-    -e "azure_location"=$AZURE_DEFAULT_LOCATION
-    -vvv
+    -e "github_branch"=$GITHUB_BRANCH
 
 print_success "Playbook execution finished. The trust relationship should be established."
 
