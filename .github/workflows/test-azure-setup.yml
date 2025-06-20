@@ -17,9 +17,6 @@ jobs:
     - name: Debug Federated Identity Credentials
       shell: bash
       run: |
-        echo "🧩 Azure registered federated credentials:"
-        az ad app federated-credential list --id ${{ secrets.AZURE_CLIENT_ID }} -o json
-        
         echo "🧩 GitHub OIDC token claims:"
         curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "$ACTIONS_ID_TOKEN_REQUEST_URL?audience=api://AzureADTokenExchange" \
