@@ -1,9 +1,8 @@
 # .github/workflows/test-azure-setup.yml
 name: Verify Azure Setup & Run Azure Login with OIDC
-permissions:
-  id-token: write
-  contents: read
+
 on:
+  workflow_dispatch:
   push:
     branches:
       - 'feature/**'
@@ -11,6 +10,9 @@ jobs:
   build-and-deploy:
     name: Login to Azure
     runs-on: ubuntu-latest
+    permissions:
+    id-token: write
+    contents: read
     steps:
     - name: Show OIDC Token Claims
       shell: bash
