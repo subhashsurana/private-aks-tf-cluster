@@ -3,9 +3,7 @@
   hosts: localhost
   connection: local
   gather_facts: false
-  # collections:
-  #   - azure.azcollection
-  #   - community.general
+
 
   vars:
     azure_ad_app_name: "my-github-actions-app"
@@ -58,17 +56,33 @@
         role_definition_id: "{{ contributor_role.roledefinitions[0].id }}"
         scope: "/subscriptions/{{ azure_subscription_id }}"
 
-    - name: Create Federated Identity Credential via Azure CLI
-      ansible.builtin.command: |
-        az ad app federated-credential create \
-        --id "{{ ad_app.app_id }}" \
-        --parameters '{
-          "name":"github-federated-credential",
-          "issuer":"https://token.actions.githubusercontent.com",
-          "subject":"repo:{{ github_owner }}/{{ github_repo }}:ref:refs/heads/{{ github_branch }}",
-          "audiences":["api://AzureADTokenExchange"]
-          }'
+    - name: Create Flexible FIC using az rest
+      ansible.builtin.command: >
+        az rest --method post
+        --url https://graph.microsoft.com/beta/applications/{{ ad_app.object_id }}/federatedIdentityCredentials
+        --body "{ 
+          \"name\": \"github-flex-id-credential\", 
+          \"issuer\": \"https://token.actions.githubusercontent.com\", 
+          \"audiences\": [\"api://AzureADTokenExchange\"], 
+          \"claimsMatchingExpression\": {
+            \"value\": \"claims['sub'] matches 'repo:{{ github_owner }}/{{ github_repo }}:ref:refs/heads/*'\",
+            \"languageVersion\": 1 
+          } 
+        }"
       changed_when: false
+      register: flexible_fic_result
+
+    # - name: Create Federated Identity Credential via Azure CLI ** branch wildcard only works when creating a Github Environment **
+    #   ansible.builtin.command: |
+    #     az ad app federated-credential create \
+    #     --id "{{ ad_app.app_id }}" \
+    #     --parameters '{
+    #       "name":"gh-flexible-federated-credential",
+    #       "issuer":"https://token.actions.githubusercontent.com",
+    #       "audiences":["api://AzureADTokenExchange"],
+    #       "subject":"repo:{{ github_owner }}/{{ github_repo }}:ref:refs/heads/{{ github_branch }}"
+    #     }'
+    #   changed_when: false
 
     - name: Check if encrypt_secrets.py exists
       ansible.builtin.stat:

@@ -15,10 +15,6 @@ jobs:
       contents: read
     steps:
 
-    - name: Debug hashed client ID
-      run: |
-        echo -n "${{ secrets.AZURE_CLIENT_ID }}" | sha256sum
-        
     - name: Login to Azure with Federated Identity
       uses: azure/login@v2
       with:

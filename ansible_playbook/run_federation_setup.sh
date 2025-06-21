@@ -243,8 +243,8 @@ ansible-playbook ansible_playbook/ansible_playbook_azure_gh.yml \
     -e "azure_subscription_id=$AZURE_SUBSCRIPTION_ID" \
     -e "azure_tenant_id=$AZURE_TENANT_ID" \
     -e "github_owner=$GITHUB_OWNER" \
-    -e "github_repo=$GITHUB_REPO" \
-    -e "github_branch"=$GITHUB_BRANCH
+    -e "github_repo=$GITHUB_REPO" 
+#    -e "github_branch"=$GITHUB_BRANCH
 
 print_success "Playbook execution finished. The trust relationship should be established."
 
