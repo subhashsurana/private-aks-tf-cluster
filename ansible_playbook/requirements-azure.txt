@@ -1,0 +1,25 @@
+# Identity & Auth
+azure-identity
+azure-mgmt-msi
+azure-mgmt-authorization
+azure.mgmt.automation
+azure.mgmt.notificationhubs
+azure.mgmt.datafactory
+
+# Resource Management
+azure-mgmt-resource
+azure.mgmt.resourcehealth
+
+# Networking & Storage
+azure-mgmt-network
+azure-storage-blob
+
+# Optional Graph
+msgraph-core
+msgraph-sdk
+
+# Ansible Crypto Support
+pynacl
+
+azure-storage-common
+azure-mgmt-automation

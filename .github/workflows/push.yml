@@ -1,0 +1,37 @@
+name: Push Up
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    env:
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      GH_TOKEN: ${{ github.token }}
+      TS_ENV: dev
+      TS_TOKEN: ${{ secrets.TS_TOKEN }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Install Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 3.1
+        bundler-cache: true # runs 'bundle install' and caches installed gems automatically
+
+    - name: Install Terraspace
+      run:
+        .github/bin/install
+
+    - name: Run Terraspace
+      run: |
+        terraspace up demo -y
