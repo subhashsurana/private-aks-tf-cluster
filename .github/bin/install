@@ -10,6 +10,6 @@ terraform --version
 bundle install
 bundle exec terraspace new shim
 terraspace --version
-
+export TS_VERSION_CHECK=0
 # install infracost
 curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
