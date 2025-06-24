@@ -1,0 +1,81 @@
+package test
+
+import (
+	"fmt"
+	"testing"
+
+	"github.com/gruntwork-io/terratest/modules/azure"
+	"github.com/gruntwork-io/terratest/modules/random"
+	"github.com/gruntwork-io/terratest/modules/terraform"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestAksModule(t *testing.T) {
+	t.Parallel()
+
+	// Generate a random prefix to prevent naming conflictsr
+	uniquePrefix := fmt.Sprintf("terratest-%s", random.UniqueId())
+	
+	// Configure Terraform options
+	terraformOptions := &terraform.Options{
+		// The path to where your Terraform code is located
+		TerraformDir: "../../stacks/aks",
+		
+		// Specify the Terraform binary to use
+		TerraformBinary: "terraform",
+		
+		// Variables to pass to our Terraform code using -var options
+		Vars: map[string]interface{}{
+			"prefix":                uniquePrefix,
+			"location":              "eastus",
+			"kubernetes_version":    "1.25.5",
+			"node_count":            2,
+			"vm_size":               "Standard_D2s_v3",
+			"vnet_id":               "/subscriptions/your-subscription-id/resourceGroups/your-rg/providers/Microsoft.Network/virtualNetworks/your-vnet",
+			"subnet_id":             "/subscriptions/your-subscription-id/resourceGroups/your-rg/providers/Microsoft.Network/virtualNetworks/your-vnet/subnets/your-subnet",
+		},
+		
+		// Environment variables for authentication
+		EnvVars: map[string]string{
+			"ARM_CLIENT_ID":       "", // Set these in your CI/CD pipeline or locally
+			"ARM_CLIENT_SECRET":   "", // for testing, or use Azure CLI authentication
+			"ARM_SUBSCRIPTION_ID": "",
+			"ARM_TENANT_ID":       "",
+		},
+		
+		// Disable colors in Terraform commands so its easier to parse
+		NoColor: true,
+	}
+
+	// At the end of the test, run `terraform destroy` to clean up any resources that were created
+	defer terraform.Destroy(t, terraformOptions)
+
+	// Run `terraform init` and `terraform apply`
+	terraform.InitAndApply(t, terraformOptions)
+
+	// Run `terraform output` to get the values of output variables
+	aksClusterName := terraform.Output(t, terraformOptions, "aks_cluster_name")
+	resourceGroupName := terraform.Output(t, terraformOptions, "resource_group_name")
+	
+	// Verify that the AKS cluster exists
+	exists := azure.ContainerServiceManagedClusterExists(t, aksClusterName, resourceGroupName, "")
+	assert.True(t, exists, "AKS cluster should exist")
+	
+	// Verify that the outputs are not empty
+	assert.NotEmpty(t, aksClusterName, "AKS cluster name should not be empty")
+	assert.NotEmpty(t, resourceGroupName, "Resource group name should not be empty")
+	
+	// Additional tests you might want to add:
+	
+	// 1. Test that the correct Kubernetes version was deployed
+	// version := terraform.Output(t, terraformOptions, "kubernetes_version")
+	// assert.Equal(t, "1.25.5", version, "Kubernetes version should match input")
+	
+	// 2. Test that the node count is correct
+	// nodeCount := terraform.Output(t, terraformOptions, "node_count")
+	// assert.Equal(t, "2", nodeCount, "Node count should match input")
+	
+	// 3. Test that you can connect to the cluster
+	// kubeconfig := terraform.Output(t, terraformOptions, "kube_config")
+	// ... use the kubeconfig to connect to the cluster and verify functionality
+}

@@ -1,5 +1,11 @@
-variable "prefix" {}
-variable "location" {}
+variable "prefix" {
+  type        = string
+  description = "Prefix for resource names"
+}
+variable "location" {
+  type        = string
+  description = "Azure region for resource deployment"
+}
 variable "vnet_cidr" {
   type    = list(string)
   default = ["10.0.0.0/16"]
